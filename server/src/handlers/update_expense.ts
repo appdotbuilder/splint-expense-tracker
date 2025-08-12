@@ -1,16 +1,46 @@
+import { db } from '../db';
+import { expensesTable } from '../db/schema';
 import { type UpdateExpenseInput, type Expense } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function updateExpense(input: UpdateExpenseInput): Promise<Expense | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is updating an existing expense.
-    // Should validate that the requesting user has permission to modify the expense.
-    // Returns updated expense or null if not found.
-    return Promise.resolve({
-        id: input.id,
-        group_id: 1, // Placeholder
-        paid_by: 1, // Placeholder
-        amount: input.amount || 0,
-        description: input.description || 'Updated expense',
-        created_at: new Date()
-    } as Expense);
+  try {
+    // Build update object with only provided fields
+    const updateData: any = {};
+    
+    if (input.amount !== undefined) {
+      updateData.amount = input.amount.toString(); // Convert number to string for numeric column
+    }
+    
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+
+    // If no fields to update, return null
+    if (Object.keys(updateData).length === 0) {
+      return null;
+    }
+
+    // Update the expense
+    const result = await db.update(expensesTable)
+      .set(updateData)
+      .where(eq(expensesTable.id, input.id))
+      .returning()
+      .execute();
+
+    // Return null if no expense was found/updated
+    if (result.length === 0) {
+      return null;
+    }
+
+    // Convert numeric fields back to numbers before returning
+    const expense = result[0];
+    return {
+      ...expense,
+      amount: parseFloat(expense.amount) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Expense update failed:', error);
+    throw error;
+  }
 }
